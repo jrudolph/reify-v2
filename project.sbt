@@ -1,10 +1,8 @@
-sbtPlugin := true
-
 name := "reify-v2"
 
 organization := "net.virtual-void"
 
-version := "0.1.0-SNAPSHOT"
+version := "1"
 
 homepage := Some(url("http://github.com/jrudolph/reify-v2"))
 
