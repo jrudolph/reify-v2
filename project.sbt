@@ -2,7 +2,7 @@ name := "reify-v2"
 
 organization := "net.virtual-void"
 
-version := "1"
+version := "2"
 
 homepage := Some(url("http://github.com/jrudolph/reify-v2"))
 
