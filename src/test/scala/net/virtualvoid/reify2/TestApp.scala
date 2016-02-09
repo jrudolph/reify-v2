@@ -21,6 +21,7 @@ import scala.reflect.macros.blackbox.Context
 
 object TestApp {
   def test(i: Int): String = macro testMacro
+  def test2(i: Int): Seq[Int] = macro testMacro2
 
   def show[T](t: T): T = macro showTree[T]
   def showTree[T](c: Context)(t: c.Expr[T]): c.Expr[T] = { println(s"Show '${c.universe.show(t)}'"); t }
@@ -45,6 +46,25 @@ object TestApp {
       }
       println(c.universe.show(res.tree))
       res
+    }
+  }.res
+
+  def testMacro2(c: Context)(i: c.Expr[Int]): c.Expr[Seq[Int]] = new Impl[c.type](c) {
+    import c.universe._
+
+    def res: c.Expr[Seq[Int]] = {
+      val r =
+        i.tree match {
+          case Block(stats, expr) ⇒
+            val allStats: Seq[Expr[Int]] = stats.map(Expr[Int](_)) :+ Expr[Int](expr)
+            reify {
+              var x = 42
+              Seq(1, 2, 3)
+              allStats.spliceSeq
+            }
+        }
+      println(r)
+      r
     }
   }.res
 }

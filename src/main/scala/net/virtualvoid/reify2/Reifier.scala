@@ -29,9 +29,17 @@ trait Reifier extends WithContext {
     def tree: Tree
   }
 
+  trait SeqExpr[+T] {
+    @compileTimeOnly("spliceSeq can only be used inside of reify")
+    def spliceSeq: Seq[T] = ???
+  }
+
   implicit def autoConv[T](exp: c.Expr[T]): Expr[T] = new Expr[T] { def tree = exp.tree }
   implicit def autoConvReverse[T](e: Expr[T]): c.Expr[T] = c.Expr[T](e.tree)
   implicit def convToUnit[T](exp: Expr[T]): Expr[Unit] = new Expr[Unit] { def tree = exp.tree }
+
+  @compileTimeOnly("addSpliceSeq can only be used inside of reify")
+  implicit def addSpliceSeq[T](s: Seq[Expr[T]]): SeqExpr[T] = ???
 
   @compileTimeOnly("reified can only be used inside of reify")
   implicit def Reified[T](any: T): { def reified: Expr[T] } = ???
@@ -96,6 +104,12 @@ object ReifierImpl {
 
           q"$name(..${placeholder.args})"
 
+        case q"${ _ }.addSpliceSeq[..${ _ }]($expr).spliceSeq" ⇒
+          val name = c.fresh(newTermName("placeholder$"))
+          val placeholder = RemoveInnerReify.run(expr)
+          addPlaceholder(name, placeholder)
+
+          q"scala.collection.immutable.Seq.apply($name(..${placeholder.args}))"
         case _ ⇒ super.transform(tree)
       }
     }
@@ -196,17 +210,27 @@ object ReifierImpl {
 
     object ReplacePlaceholder extends Transformer {
       override def transform(tree: Tree): Tree = tree match {
+        case q"scala.collection.immutable.List.apply(${ _ }.Apply(${ _ }.Ident(${ NewTermName(name) }), ${ _ }.List.apply(..$args)))" ⇒
+          val before = placeholders(newTermName(name))
+          val placed = (new InsertInnerReifies).run(before, args)
+
+          //println(s"Found Seq placeholder!!! $name\nBefore: $before\nAfter: $placed")
+
+          val els = q"$placed.map(_.tree.asInstanceOf[$$u.Tree])"
+          q"scala.collection.immutable.List.apply($els: _*)"
         case q"${ _ }.Apply(${ _ }.Ident(${ NewTermName(name) }), ${ _ }.List.apply(..$args))" if name.startsWith("placeholder$") ⇒
           val before = placeholders(newTermName(name))
           val placed = (new InsertInnerReifies).run(before, args)
 
           //println(s"Found placeholder!!! $name\nBefore: $before\nAfter: $placed")
-          q"${placed}.tree.asInstanceOf[$$u.Tree]"
+          q"$placed.tree.asInstanceOf[$$u.Tree]"
+
         case _ ⇒ super.transform(tree)
       }
     }
 
     val replaced = ReplacePlaceholder.transform(reified)
+    //println(s"After placeholder replacement: $replaced")
 
     def createFreshName(name: TermName): Tree = q"val $name = ${c.prefix}.c.fresh(${c.prefix}.c.universe.newTermName(${name.decoded + "$"}))"
     object ReplaceFreshNames extends Transformer {
