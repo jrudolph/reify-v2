@@ -34,12 +34,14 @@ trait Reifier extends WithContext {
     def spliceSeq: Seq[T] = ???
   }
 
-  implicit def autoConv[T](exp: c.Expr[T]): Expr[T] = new Expr[T] { def tree = exp.tree }
+  implicit def autoConv[T](exp: Context#Expr[T]): Expr[T] = new Expr[T] { def tree = exp.tree.asInstanceOf[Tree] }
   implicit def autoConvReverse[T](e: Expr[T]): c.Expr[T] = c.Expr[T](e.tree)
   implicit def convToUnit[T](exp: Expr[T]): Expr[Unit] = new Expr[Unit] { def tree = exp.tree }
 
   @compileTimeOnly("addSpliceSeq can only be used inside of reify")
   implicit def addSpliceSeq[T](s: Seq[Expr[T]]): SeqExpr[T] = ???
+  @compileTimeOnly("addSpliceSeq can only be used inside of reify")
+  implicit def addSpliceSeq2[T](s: Seq[Context#Expr[T]]): SeqExpr[T] = ???
 
   @compileTimeOnly("reified can only be used inside of reify")
   implicit def Reified[T](any: T): { def reified: Expr[T] } = ???
@@ -100,11 +102,9 @@ object ReifierImpl {
           val placeholder = RemoveInnerReify.run(expr)
           addPlaceholder(name, placeholder)
 
-          //println(s"Found splice for $expr: $placeholder")
-
           q"$name(..${placeholder.args})"
 
-        case q"${ _ }.addSpliceSeq[..${ _ }]($expr).spliceSeq" ⇒
+        case q"${ _ }.${ TermName("addSpliceSeq") | TermName("addSpliceSeq2") }[..${ _ }]($expr).spliceSeq" ⇒
           val name = c.freshName(TermName("placeholderSeq$"))
           val placeholder = RemoveInnerReify.run(expr)
           addPlaceholder(name, placeholder)
@@ -165,18 +165,6 @@ object ReifierImpl {
     val pref = c.prefix
     def buildExpr[T: c.WeakTypeTag](t: Tree): Tree = q"new $pref.Expr[${c.weakTypeTag[T]}] { val tree = $t.asInstanceOf[$pref.c.universe.Tree] }"
 
-    /*val justTheBuilder = reified match {
-      case Block(_, Apply(Apply(_, List(_, Block(List(ClassDef(_, _, _, Template(_, _, List(_, DefDef(_, _, _, _, _, Block(_, justTheBuilder)))))), _))), _)) ⇒ justTheBuilder
-    }
-    def extractUniverse(t: Tree): TermName = t match {
-      case Apply(fun, _)   ⇒ extractUniverse(fun)
-      case Select(qual, _) ⇒ extractUniverse(qual)
-      case Ident(x)        ⇒ x.toTermName
-    }
-    val v = extractUniverse(justTheBuilder)*/
-
-    //println(s"Just the builder: ${justTheBuilder.productPrefix} $v $justTheBuilder")
-
     class InsertInnerReifies extends Transformer {
       var args = Seq.empty[Tree]
       var tpes = Seq.empty[Type]
@@ -209,21 +197,19 @@ object ReifierImpl {
     }
 
     object ReplacePlaceholder extends Transformer {
+      def replacement(name: String, args: Seq[Tree]): Tree = {
+        (new InsertInnerReifies).run(placeholders(TermName(name)), args)
+      }
+
       override def transform(tree: Tree): Tree = tree match {
         case q"scala.collection.immutable.List.apply(${ _ }.Apply(${ _ }.Ident(${ NewTermName(name) }), ${ _ }.List.apply(..$args)))" if name.startsWith("placeholderSeq$") ⇒
-          val before = placeholders(TermName(name))
-          val placed = (new InsertInnerReifies).run(before, args)
-
           //println(s"Found Seq placeholder!!! $name\nBefore: $before\nAfter: $placed")
 
-          val els = q"$placed.map(_.tree.asInstanceOf[$$u.Tree])"
+          val els = q"${replacement(name, args)}.map(_.tree.asInstanceOf[$$u.Tree])"
           q"scala.collection.immutable.List.apply($els: _*)"
         case q"${ _ }.Apply(${ _ }.Ident(${ NewTermName(name) }), ${ _ }.List.apply(..$args))" if name.startsWith("placeholder$") ⇒
-          val before = placeholders(TermName(name))
-          val placed = (new InsertInnerReifies).run(before, args)
-
           //println(s"Found placeholder!!! $name\nBefore: $before\nAfter: $placed")
-          q"$placed.tree.asInstanceOf[$$u.Tree]"
+          q"${replacement(name, args)}.tree.asInstanceOf[$$u.Tree]"
 
         case _ ⇒ super.transform(tree)
       }
