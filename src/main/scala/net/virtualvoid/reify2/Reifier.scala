@@ -96,7 +96,7 @@ object ReifierImpl {
     object CreatePlaceholders extends Transformer {
       override def transform(tree: Tree): Tree = tree match {
         case q"$expr.splice" ⇒
-          val name = c.fresh(newTermName("placeholder$"))
+          val name = c.freshName(TermName("placeholder$"))
           val placeholder = RemoveInnerReify.run(expr)
           addPlaceholder(name, placeholder)
 
@@ -105,7 +105,7 @@ object ReifierImpl {
           q"$name(..${placeholder.args})"
 
         case q"${ _ }.addSpliceSeq[..${ _ }]($expr).spliceSeq" ⇒
-          val name = c.fresh(newTermName("placeholder$"))
+          val name = c.freshName(TermName("placeholderSeq$"))
           val placeholder = RemoveInnerReify.run(expr)
           addPlaceholder(name, placeholder)
 
@@ -150,13 +150,13 @@ object ReifierImpl {
     //println(s"Found defs: $allDefs in $t")
 
     val newNames = allDefs.map { s ⇒
-      s -> c.fresh(newTermName(s.asTerm.name.asInstanceOf[TermName].decoded + "$"))
+      s -> c.freshName(TermName(s.asTerm.name.decodedName + "$"))
     }.toMap
 
-    val freshenized = (new HygienifyDefs(newNames)).transform(withPlaceholders)
+    val freshenized = new HygienifyDefs(newNames).transform(withPlaceholders)
     val justTheNames = newNames.values.toSet
 
-    val univ = c.typeCheck(q"${c.prefix}.c.universe")
+    val univ = c.typecheck(q"${c.prefix}.c.universe")
 
     //println(s"Before reification $freshenized")
     val reified = c.reifyTree(univ, EmptyTree, freshenized)
@@ -165,7 +165,7 @@ object ReifierImpl {
     val pref = c.prefix
     def buildExpr[T: c.WeakTypeTag](t: Tree): Tree = q"new $pref.Expr[${c.weakTypeTag[T]}] { val tree = $t.asInstanceOf[$pref.c.universe.Tree] }"
 
-    val justTheBuilder = reified match {
+    /*val justTheBuilder = reified match {
       case Block(_, Apply(Apply(_, List(_, Block(List(ClassDef(_, _, _, Template(_, _, List(_, DefDef(_, _, _, _, _, Block(_, justTheBuilder)))))), _))), _)) ⇒ justTheBuilder
     }
     def extractUniverse(t: Tree): TermName = t match {
@@ -173,7 +173,7 @@ object ReifierImpl {
       case Select(qual, _) ⇒ extractUniverse(qual)
       case Ident(x)        ⇒ x.toTermName
     }
-    val v = extractUniverse(justTheBuilder)
+    val v = extractUniverse(justTheBuilder)*/
 
     //println(s"Just the builder: ${justTheBuilder.productPrefix} $v $justTheBuilder")
 
@@ -210,8 +210,8 @@ object ReifierImpl {
 
     object ReplacePlaceholder extends Transformer {
       override def transform(tree: Tree): Tree = tree match {
-        case q"scala.collection.immutable.List.apply(${ _ }.Apply(${ _ }.Ident(${ NewTermName(name) }), ${ _ }.List.apply(..$args)))" ⇒
-          val before = placeholders(newTermName(name))
+        case q"scala.collection.immutable.List.apply(${ _ }.Apply(${ _ }.Ident(${ NewTermName(name) }), ${ _ }.List.apply(..$args)))" if name.startsWith("placeholderSeq$") ⇒
+          val before = placeholders(TermName(name))
           val placed = (new InsertInnerReifies).run(before, args)
 
           //println(s"Found Seq placeholder!!! $name\nBefore: $before\nAfter: $placed")
@@ -219,7 +219,7 @@ object ReifierImpl {
           val els = q"$placed.map(_.tree.asInstanceOf[$$u.Tree])"
           q"scala.collection.immutable.List.apply($els: _*)"
         case q"${ _ }.Apply(${ _ }.Ident(${ NewTermName(name) }), ${ _ }.List.apply(..$args))" if name.startsWith("placeholder$") ⇒
-          val before = placeholders(newTermName(name))
+          val before = placeholders(TermName(name))
           val placed = (new InsertInnerReifies).run(before, args)
 
           //println(s"Found placeholder!!! $name\nBefore: $before\nAfter: $placed")
@@ -232,12 +232,12 @@ object ReifierImpl {
     val replaced = ReplacePlaceholder.transform(reified)
     //println(s"After placeholder replacement: $replaced")
 
-    def createFreshName(name: TermName): Tree = q"val $name = ${c.prefix}.c.fresh(${c.prefix}.c.universe.newTermName(${name.decoded + "$"}))"
+    def createFreshName(name: TermName): Tree = q"val $name = ${c.prefix}.c.freshName(${c.prefix}.c.universe.TermName(${name.decodedName + "$"}))"
     object ReplaceFreshNames extends Transformer {
       override def transform(tree: Tree): Tree = tree match {
-        case NewTermName(name) if justTheNames(name) ⇒
+        case NewTermName(name) if justTheNames(TermName(name)) ⇒
           //println(s"Found instance of $name: $tree")
-          q"${Ident(name)}.asInstanceOf[$$u.TermName]"
+          q"${Ident(TermName(name))}.asInstanceOf[$$u.TermName]"
         case _ ⇒ super.transform(tree)
       }
     }
@@ -249,6 +249,6 @@ object ReifierImpl {
       ${ReplaceFreshNames.transform(replaced)}
     """
 
-    c.Expr[c.prefix.value.Expr[T]](atPos(t.tree.pos)(c.resetLocalAttrs(withFreshNames)))
+    c.Expr[c.prefix.value.Expr[T]](atPos(t.tree.pos)(c.untypecheck(withFreshNames)))
   }
 }
