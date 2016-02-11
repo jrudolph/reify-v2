@@ -17,11 +17,12 @@
 
 package net.virtualvoid.reify2
 
-import net.virtualvoid.reify2.CommalessSeq.RichAny
 import org.specs2.mutable.Specification
 
+import net.virtualvoid.reify2.CommalessSeq.RichAny
+
 class SpliceSeqTest extends Specification {
-  "SpliceSeq" should {
+  "spliceSeq" should {
     "commaless seq example" in {
       {
         1
@@ -31,9 +32,10 @@ class SpliceSeqTest extends Specification {
         5
       }.seqify must be_==(Seq(1, 2, 3, 4, 5))
     }
+
     "fast constant array example" in {
       def f(x: Int): Int = x + 42
-      FastArray(1, 2, 3, 4, f(5), 6, 7, 8) must be_==(Array(1, 2, 3, 4, 47, 6, 7, 8))
+      FastArray.naive(1, 2, 3, 4, f(5), 6, 7, 8) must be_==(Array(1, 2, 3, 4, 47, 6, 7, 8))
     }
   }
 }

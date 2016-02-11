@@ -32,6 +32,9 @@ trait Reifier extends WithContext {
   trait SeqExpr[+T] {
     @compileTimeOnly("spliceSeq can only be used inside of reify")
     def spliceSeq: Seq[T] = ???
+
+    @compileTimeOnly("spliceStatements can only be used inside of reify")
+    def spliceStatements: Unit = ???
   }
 
   implicit def autoConv[T](exp: Context#Expr[T]): Expr[T] = new Expr[T] { def tree = exp.tree.asInstanceOf[Tree] }
@@ -110,6 +113,13 @@ object ReifierImpl {
           addPlaceholder(name, placeholder)
 
           q"scala.collection.immutable.Seq.apply($name(..${placeholder.args}))"
+        case q"${ _ }.${ TermName("addSpliceSeq") | TermName("addSpliceSeq2") }[..${ _ }]($expr).spliceStatements" ⇒
+          val name = c.freshName(TermName("placeholderStatements$"))
+          val placeholder = RemoveInnerReify.run(expr)
+          addPlaceholder(name, placeholder)
+
+          q"{ $name(..${placeholder.args}); () }"
+
         case _ ⇒ super.transform(tree)
       }
     }
@@ -210,6 +220,11 @@ object ReifierImpl {
         case q"${ _ }.Apply(${ _ }.Ident(${ NewTermName(name) }), ${ _ }.List.apply(..$args))" if name.startsWith("placeholder$") ⇒
           //println(s"Found placeholder!!! $name\nBefore: $before\nAfter: $placed")
           q"${replacement(name, args)}.tree.asInstanceOf[$$u.Tree]"
+
+        case q"scala.collection.immutable.List.apply(${ _ }.Apply(${ _ }.Ident(${ NewTermName(name) }), ${ _ }.List.apply(..$args)))" if name.startsWith("placeholderStatements$") ⇒
+          //println(s"Found placeholderStatements!!! $name\nBefore: $tree\n\nAfter: $repl")
+          val els = q"${replacement(name, args)}.map(_.tree.asInstanceOf[$$u.Tree])"
+          q"scala.collection.immutable.List.apply($els: _*)"
 
         case _ ⇒ super.transform(tree)
       }
