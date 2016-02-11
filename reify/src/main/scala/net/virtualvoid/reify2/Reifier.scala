@@ -169,6 +169,12 @@ object ReifierImpl {
     val univ = c.typecheck(q"${c.prefix}.c.universe")
 
     //println(s"Before reification $freshenized")
+
+    // We need to copy over the original type in case the original tree was a spliced one
+    // so that `freshenized` directly points to an untyped placeholder.
+    // `reifyTree` fails if it is invoked on an untyped tree (it doesn't care about
+    // inner untyped trees, though...).
+    c.internal.setType(freshenized, t.tree.tpe)
     val reified = c.reifyTree(univ, EmptyTree, freshenized)
     //println(s"Reified: $reified")
 

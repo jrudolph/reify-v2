@@ -40,7 +40,7 @@ object CommalessSeq {
           case q"${ _ }.RichAny[..${ _ }](${ x @ Block(stats, res) })" ⇒
             val exprs = (stats :+ res).map(SafeExpr[T](_))
             reify {
-              exprs.spliceSeq: Seq[T] // TODO: remove the need for the type ascription
+              exprs.spliceSeq
             }
         }
     }.run

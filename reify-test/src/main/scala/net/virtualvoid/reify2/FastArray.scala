@@ -25,8 +25,10 @@ object FastArray {
       def run: c.Expr[Array[T]] =
         reify {
           implicit val ct: ClassTag[T] = tTag.splice
+          // create the array
           val res = new Array[T](c.literal(els.size).splice)
 
+          // fill the array
           (0 until els.size).map { idx ⇒
             reifyInner {
               res(c.literal(idx).splice) = els(idx).splice

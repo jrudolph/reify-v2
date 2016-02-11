@@ -2,6 +2,9 @@ package net.virtualvoid.reify2
 
 import scala.reflect.macros.blackbox
 
+/**
+ * A small example of a compiler for a simple lambda language implemented with a macro
+ */
 object ASTCompiler {
   object AST {
     sealed trait Expr
@@ -32,6 +35,10 @@ object ASTCompiler {
       def run: c.Expr[Int ⇒ Int] = {
         val ast = parse(expr.tree)
 
+        /**
+         * As we don't have any type-checking (yet?), we defer all potential type-checks to
+         * the run time, i.e. generate `asInstanceOf` calls where necessary.
+         */
         def generateAny(expr: AST.Expr, argument: Expr[Any]): Expr[Any] = expr match {
           case AST.TheArgument ⇒ argument
           case AST.Plus(x, y)  ⇒ generateInt(expr, reify(argument.splice.asInstanceOf[Int]))
