@@ -31,6 +31,7 @@ object ReifyBuild extends Build {
       .dependsOn(reify)
 
   def defaultSettings = Seq(
+    scalaVersion := "2.11.7",
     crossScalaVersions := Seq("2.11.7", "2.12.0-M3"),
     scalacOptions ++= Seq("-language:_", "-deprecation", "-unchecked"),
 
