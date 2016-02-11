@@ -4,13 +4,22 @@ import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.reflect.macros.blackbox
 
-object FastArray {
-  def apply[T: ClassTag](els: T*): Array[T] = macro impl[T]
-  def naive[T: ClassTag](els: T*): Array[T] = macro naiveImpl[T]
+object FastConstructor {
+  // a constructor for array's that doesn't go through the varargs Array.apply method
+  // (not needed in practice, scalac makes the same optimization somewhere).
+  // demonstrates `spliceStatements`
+  def array[T: ClassTag](els: T*): Array[T] = macro arrayImpl[T]
 
+  // a naive implementation of the above, which will go through Seq.apply().copyToArray
+  // which wouldn't really improve anything
+  // demonstrates `spliceSeq`
+  def naiveArray[T: ClassTag](els: T*): Array[T] = macro naiveArrayImpl[T]
+
+  // the same optimization for List.apply
+  // demonstrate general Reifier usage
   def list[T](els: T*): List[T] = macro listImpl[T]
 
-  def naiveImpl[T: ctx.WeakTypeTag](ctx: blackbox.Context)(els: ctx.Expr[T]*)(tTag: ctx.Expr[ClassTag[T]]): ctx.Expr[Array[T]] =
+  def naiveArrayImpl[T: ctx.WeakTypeTag](ctx: blackbox.Context)(els: ctx.Expr[T]*)(tTag: ctx.Expr[ClassTag[T]]): ctx.Expr[Array[T]] =
     new Reifier {
       val c: ctx.type = ctx
       def run: c.Expr[Array[T]] =
@@ -22,7 +31,7 @@ object FastArray {
         }
     }.run
 
-  def impl[T: ctx.WeakTypeTag](ctx: blackbox.Context)(els: ctx.Expr[T]*)(tTag: ctx.Expr[ClassTag[T]]): ctx.Expr[Array[T]] =
+  def arrayImpl[T: ctx.WeakTypeTag](ctx: blackbox.Context)(els: ctx.Expr[T]*)(tTag: ctx.Expr[ClassTag[T]]): ctx.Expr[Array[T]] =
     new Reifier {
       val c: ctx.type = ctx
       def run: c.Expr[Array[T]] =

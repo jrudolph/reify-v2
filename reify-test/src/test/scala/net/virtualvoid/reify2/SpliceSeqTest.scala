@@ -35,7 +35,7 @@ class SpliceSeqTest extends Specification {
 
     "fast constant array example" in {
       def f(x: Int): Int = x + 42
-      FastArray.naive(1, 2, 3, 4, f(5), 6, 7, 8) must be_==(Array(1, 2, 3, 4, 47, 6, 7, 8))
+      FastConstructor.naiveArray(1, 2, 3, 4, f(5), 6, 7, 8) must be_==(Array(1, 2, 3, 4, 47, 6, 7, 8))
     }
   }
 }

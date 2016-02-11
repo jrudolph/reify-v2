@@ -20,7 +20,17 @@ package net.virtualvoid.reify2
 import scala.reflect.macros.blackbox
 
 /**
- * An example macro that converts blocks into sequences.
+ * An example macro that converts blocks into sequences to demonstrate `spliceSeq`.
+ * The macro will convert
+ * {
+ *  1
+ *  2
+ *  3
+ *  4
+ *  5
+ * }
+ *
+ * into Seq(1, 2, 3, 4, 5)
  */
 object CommalessSeq {
   implicit class RichAny[T](t: T) {
