@@ -60,7 +60,7 @@ object ASTCompiler {
         }
         def generateAndPrint(expr: AST.Expr, argument: Expr[Int]): Expr[Int] = {
           val res = generateInt(expr, argument)
-          println(s"Result for $expr is ${show(res.tree)}")
+          //println(s"Result for $expr is ${show(res.tree)}")
           res
         }
 
