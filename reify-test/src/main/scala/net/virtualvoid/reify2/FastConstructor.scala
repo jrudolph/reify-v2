@@ -36,7 +36,7 @@ object FastConstructor {
       val c: ctx.type = ctx
       def run: c.Expr[Array[T]] =
         reify {
-          implicit val ct: ClassTag[T] = tTag.splice
+          implicit val ct: ClassTag[T] = tTag.splice // TODO: replace types with static information if classtag is static
           // create the array
           val res = new Array[T](c.literal(els.size).splice)
 
@@ -65,3 +65,4 @@ object FastConstructor {
       }
     }.run
 }
+
