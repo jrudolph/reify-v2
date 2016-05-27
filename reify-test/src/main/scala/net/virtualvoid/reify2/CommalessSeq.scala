@@ -45,13 +45,16 @@ object CommalessSeq {
       private def SafeExpr[T: WeakTypeTag](t: Tree): Expr[T] =
         Expr[T](q"$t: ${weakTypeTag[T]}")
 
-      def run: ctx.Expr[Seq[T]] =
-        c.prefix.tree match {
-          case q"${ _ }.RichAny[..${ _ }](${ x @ Block(stats, res) })" ⇒
-            val exprs = (stats :+ res).map(SafeExpr[T](_))
-            reify {
-              exprs.spliceSeq
-            }
+      def run: ctx.Expr[Seq[T]] = {
+        val blockExprs =
+          c.prefix.tree match {
+            case q"${ _ }.RichAny[..${ _ }](${ x @ Block(stats, res) })" ⇒
+              (stats :+ res).map(SafeExpr[T](_))
+          }
+
+        reify {
+          blockExprs.spliceSeq
         }
+      }
     }.run
 }
