@@ -17,15 +17,20 @@ object Unreify {
       def unapply(t: Expr[T]): Option[(Expr[U1], Expr[U2])]
     }
 
+    case class Binding[T]()
     // e.g.
     // extract from the AST example
     // case q"${_}.Plus(x, y)" =>
 
+    trait UnreifyLambda[T, U] {
+      def unapply(t: Expr[T ⇒ U]): Option[(Binding[T], Expr[U])]
+    }
     // or
     // case q"${ _ }.Literal.apply(${ Literal(Constant(i: Int)) })" =>
 
     def unreify[T, U](pf: Nothing ⇒ T): UnApplyer[T, U] = ???
     def unreify[T, U1, U2](pf: (Nothing, Nothing) ⇒ T): UnApplyer2[T, U1, U2] = ???
+    //def unreifyLambda[T, U](): UnreifyLambda[T, U]
 
     val Literal: UnApplyer[AST.Expr, Int] =
       unreify(AST.Literal(_))
